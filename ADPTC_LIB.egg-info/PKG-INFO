@@ -1,0 +1,115 @@
+Metadata-Version: 2.1
+Name: ADPTC-LIB
+Version: 0.0.7
+Summary: 自适应密度峰值树聚类（Adaptive Density Peak Tree Clustering）
+Home-page: UNKNOWN
+Author: SongJ
+Author-email: songjie0613@126.com
+License: UNKNOWN
+Description: <!--
+         * @Description: 
+         * @Author: SongJ
+         * @Date: 2020-12-29 13:52:28
+         * @LastEditTime: 2021-04-12 10:44:01
+         * @LastEditors: SongJ
+        -->
+        
+        ## 自适应密度峰值树聚类（Adaptive Density Peak Tree Clustering）
+        本算法是在快速搜索与发现密度峰值聚类算法（Clustering by fast search and find of density peaks）CFSFDP的基础上进行改进的成果，主要解决的问题有:
+        - 手动选择聚类中心
+        - 单簇多密度峰值导致类簇误分
+        - 面向时空数据聚类时，无法顾及时空耦合
+        ### 原理：
+        通过CFSFDP算法的核心概念：局部密度和斥群值，构建密度峰值树，通过直达点、连通点和切割点分离子树，达到类簇划分的目的。
+        
+        <img src="https://cdn.jsdelivr.net/gh/SuilandCoder/PicStorage//img/image-20210409210616098.png" alt="image-20210409210616098" style="zoom: 80%;" />
+        
+        ![image-20210409210731545](https://cdn.jsdelivr.net/gh/SuilandCoder/PicStorage//img/image-20210409210731545.png)
+        
+        ![image-20210409212843640](https://cdn.jsdelivr.net/gh/SuilandCoder/PicStorage//img/image-20210409212843640.png)
+        
+        ### 使用方法：
+        #### 1. 安装:
+        
+        ```python
+        pip install ADPTC-LIB
+        ```
+        
+        #### 2. 空间数据聚类：
+        
+        ```python
+        import numpy as np
+        from ADPTC_LIB.cluster import ADPTC
+        from ADPTC_LIB import visual
+        X = np.loadtxt(r"../test_data/Aggregation.txt", delimiter="\t")
+        X = X[:,[0,1]]
+        atdpc_obj = ADPTC(X)
+        atdpc_obj.clustering(2)
+        visual.show_result(atdpc_obj.labels,X,np.array(list(atdpc_obj.core_points)))
+        ```
+        
+        ![image-20210410095608378](https://cdn.jsdelivr.net/gh/SuilandCoder/PicStorage//img/image-20210410095608378.png)
+        
+        #### 3. 空间属性数据聚类：
+        
+        ```python
+        from ADPTC_LIB.cluster import ADPTC
+        from ADPTC_LIB import visual
+        import xarray as xr
+        import os
+        import numpy as np
+        filePath = os.path.join(r'Z:\regions_daily_010deg\\05\\2013.nc')
+        dataset = xr.open_dataset(filePath)
+        pre_ds = dataset['precipitation']
+        lon = pre_ds.lon
+        lat = pre_ds.lat
+        lon_range = lon[(lon>-30)&(lon<70)]
+        lat_range = lat[(lat>30)&(lat<90)]
+        var = pre_ds.sel(lon=lon_range,lat = lat_range)
+        var = var.resample(time='1M',skipna=True).sum()
+        var_t = var.sel(time=var.time[0])
+        reduced = var_t.coarsen(lon=5).mean().coarsen(lat=5).mean()
+        data_nc = np.array(reduced)
+        spatial_eps=4
+        attr_eps=8
+        density_metric='gauss'
+        spre = ADPTC(data_nc)
+        spre.spacial_clustering_raster(spatial_eps,attr_eps,density_metric,knn_num=100,leaf_size=3000,connect_eps=0.9)
+        visual.show_result_2d(reduced,spre.labels)
+        ```
+        
+        ![image-20210410104300578](https://cdn.jsdelivr.net/gh/SuilandCoder/PicStorage//img/image-20210410104300578.png)
+        
+        #### 4.时空属性聚类：
+        
+        ```python
+        from ADPTC_LIB.cluster import ADPTC
+        from ADPTC_LIB import visual
+        import xarray as xr
+        import numpy as np
+        temp= xr.open_dataset(r'Z:\MSWX\temp\2020.nc')
+        temp_2020 = temp['air_temperature']
+        lon = temp_2020.lon
+        lat = temp_2020.lat
+        time = temp_2020.time
+        lon_range = lon[(lon>70)&(lon<140)]
+        lat_range = lat[(lat>15)&(lat<55)]
+        var = temp_2020.sel(lon=lon_range,lat = lat_range)
+        reduced = var.coarsen(lon=5).mean().coarsen(lat=5).mean()
+        data_nc = np.array(reduced)
+        s_eps = 5
+        t_eps = 1
+        attr_eps = 2.5
+        density_metric='gauss'
+        spre = ADPTC(data_nc)
+        spre.st_clustering_raster(s_eps,t_eps,attr_eps,density_metric,knn_num=100,leaf_size=3000,connect_eps=0.9)
+        visual.show_result_3d(reduced,spre,[70, 140, 15, 50],[0,12],21)
+        ```
+        
+        ![image-20210412095947596](https://cdn.jsdelivr.net/gh/SuilandCoder/PicStorage//img/image-20210412095947596.png)
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
